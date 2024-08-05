@@ -1,0 +1,209 @@
+// Laboratório 1 - Análise Léxica - ANSI C
+
+// Aluno: Welington Junio Alves de Souza
+
+// Obs: Os preprocessors (#INCLUDE, #DEFINE ...) por própria recomendação do professor, estão declarados como Palavras Reservadas
+
+PARSER_BEGIN(lexico)
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.HashMap;
+
+public class lexico {
+    public static HashMap<Integer, String> tokenNames;
+
+    // Inicializa o mapeamento dos nomes dos tokens
+    public static void initializeTokenNames() {
+        tokenNames = new HashMap<Integer, String>();
+        Field[] fields = lexicoConstants.class.getDeclaredFields();
+        for (Field field : fields) {
+            if (field.getType() == int.class) {
+                try {
+                    int value = field.getInt(null);
+                    String name = field.getName();
+                    tokenNames.put(value, name);
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    public static void main(String[] args) throws ParseException, IOException {
+        lexico parser = new lexico(System.in);
+
+        initializeTokenNames();
+
+        // Cria um FileWriter para escrever a saída em um arquivo .txt
+        FileWriter writer = new FileWriter("saida_tokens.txt");
+
+        while (true) {
+            Token t = parser.getNextToken();
+            if (t.kind == EOF) break;
+            String tokenName = tokenNames.get(t.kind);
+            String output = tokenName + " " + t.image;
+            System.out.println(output);
+            writer.write(output + "\n");
+        }
+
+        // Fecha o FileWriter
+        writer.close();
+    }
+}
+
+PARSER_END(lexico)
+
+
+// Definição de caracteres a serem ignorados (espaços em branco e caracteres de controle)
+SKIP :
+{
+  " " | "\t" | "\n" | "\f" | "\r" | // Espaços em branco e caracteres de controle
+  < COMMENT_BLOCK : "/*" (~["*"] | "*" ~["/"])* "*" "/" > | // Comentários de bloco
+  "fortran" // Palavra-chave a ser ignorada
+}
+
+TOKEN :
+{
+
+// Diretivas Pré-Processador
+  < HASHTAG_IF: "#if" > | // Não aceita o símbolo # como tokenname
+  < HASHTAG_ELSE: "#else" > |
+  < HASHTAG_IFDEF: "#ifdef" > |
+  < HASHTAG_ENDIF: "#endif" > |
+  < HASHTAG_INCLUDE: "#include" > |
+  < HASHTAG_DEFINE: "#define" > |
+
+
+// Palavras Reservadas
+  < INT: "int" > |
+  < AUTO: "auto" > |
+  < BREAK: "break" > |
+  < CASE: "case" > |
+  < CONST: "const" > |
+  < CONTINUE: "continue" > |
+  < KWDEFAULT: "default" > | // Não aceita a palavra DEFAULT como tokenname
+  < DO: "do" > |
+  < DOUBLE: "double" > |
+  < ELSE: "else" > |
+  < ENUM: "enum" > |
+  < CHAR: "char" > |
+  < EXTERN: "extern" > |
+  < RETURN: "return" > |
+  < UNION: "union" > |
+  < FLOAT: "float" > |
+  < SHORT: "short" > |
+  < UNSIGNED: "unsigned" > |
+  < FOR: "for" > |
+  < SIGNED: "signed" > |
+  < VOID: "void" > |
+  < GOTO: "goto" > |
+  < SIZEOF: "sizeof" > |
+  < VOLATILE: "volatile" > |
+  < IF: "if" > |
+  < STATIC: "static" > |
+  < WHILE: "while" > |
+  < STRUCT: "struct" > |
+  < LONG: "long" > |
+  < SWITCH: "switch" > |
+  < REGISTER: "register" > |
+  < TYPEDEF: "typedef" > |
+
+
+// Identificador
+  < ID: (["a"-"z", "A"-"Z", "_"])(["a"-"z", "A"-"Z", "0"-"9", "_"])* > |
+
+
+// Números Inteiros
+  < INT_DECIMAL: (["1"-"9"] (["0"-"9"])*) (["U", "u"])? (["L", "l"] | "LL" | "ll")? > |
+  < INT_OCTAL: "0" (["0"-"7"])* (["U", "u"])? (["L", "l"] | "LL" | "ll")? > |
+  < INT_HEXADECIMAL: "0" ["x", "X"] (["0"-"9", "a"-"f", "A"-"F"])+ (["U", "u"])? (["L", "l"] | "LL" | "ll")? > |
+
+
+// Ponto Flutuante
+  < FLOAT_CONSTANT :
+    (
+        ( (["0"-"9"])* "." (["0"-"9"])+ ) |
+        ( (["0"-"9"])+ "." (["0"-"9"])* ) |
+        ( (["0"-"9"])+ [ "e", "E" ] ( "+" | "-" )? (["0"-"9"])+ ) |
+        ( (["0"-"9"])* "." (["0"-"9"])+ [ "e", "E" ] ( "+" | "-" )? (["0"-"9"])+ ) |
+        ( (["0"-"9"])+ "." (["0"-"9"])* [ "e", "E" ] ( "+" | "-" )? (["0"-"9"])+ ) // Corrigido LAB1
+    )
+  ([ "f", "F", "l", "L" ])?> |
+
+
+// Auxiliar de Escape
+< #ASCII_ESCAPE: "\\" ["n", "t", "v", "b", "r", "f", "0", "a", "'", "\"", "\\"] > |
+< #HEX_ESCAPE: "\\x" (["0"-"9", "a"-"f", "A"-"F"])+ > |
+< #OCTAL_ESCAPE: "\\" ["0"-"7"] ((["0"-"7"])? (["0"-"7"])?) > |
+< #STRING_CONTINUE: "\\" "\n"> |
+
+// Literal de String
+< STRING_LITERAL: "\"" (~["\"", "\\", "\n"] | <ASCII_ESCAPE> | <HEX_ESCAPE> | <OCTAL_ESCAPE> | <STRING_CONTINUE>)* "\"" > |
+
+// Literal de String Largura Ampliada
+< WIDE_STRING_LITERAL: "L\"" (~["\"", "\\", "\n"] | <ASCII_ESCAPE> | <HEX_ESCAPE> | <OCTAL_ESCAPE> | <STRING_CONTINUE>)* "\"" > |
+
+// Literal de Caractere
+< CHAR_LITERAL: "'" (~["'", "\\", "\n", "\r"] | <ASCII_ESCAPE> | <HEX_ESCAPE> | <OCTAL_ESCAPE> | "\\" ["'"] ) "'" > |
+
+// Literal de Caractere Largura Ampliada
+< WIDE_CHAR_LITERAL: "L'" (~["'", "\\", "\n", "\r"] | <ASCII_ESCAPE> | <HEX_ESCAPE> | <OCTAL_ESCAPE> | "\\" ["'"] ) "'" > |
+
+
+// Operadores
+  < PLUS: "+" > |
+  < MINUS: "-" > |
+  < MULT: "*" > |
+  < DIV: "/" > |
+  < EQ: "==" > |
+  < ASSIGN: "=" > |
+  < NOT: "!" > |
+  < MOD: "%"> |
+  < INCREMENT: "++" > | 
+  < DECREMENT: "--" > | 
+  < BITWISE_AND: "&" > |
+  < BITWISE_OR: "|" > | 
+  < BITWISE_XOR: "^" > | 
+  < BITWISE_NOT: "~" > | 
+  < SHIFT_LEFT: "<<" > | 
+  < SHIFT_RIGHT: ">>" > | 
+  < LESS_THAN: "<" > | 
+  < GREATER_THAN: ">" > |
+  < LESS_THAN_OR_EQUAL: "<=" > | 
+  < GREATER_THAN_OR_EQUAL: ">=" > | 
+  < NOT_EQUAL: "!=" > | 
+  < LOGICAL_AND: "&&" > | 
+  < LOGICAL_OR: "||" > | 
+  < PLUS_ASSIGN: "+=" > | 
+  < MINUS_ASSIGN: "-=" > | 
+  < MULTIPLY_ASSIGN: "*=" > |
+  < DIVIDE_ASSIGN: "/=" > | 
+  < MODULUS_ASSIGN: "%=" > | 
+  < AND_ASSIGN: "&=" > | 
+  < OR_ASSIGN: "|=" > |
+  < XOR_ASSIGN: "^=" > | 
+  < SHIFT_LEFT_ASSIGN: "<<=" > | 
+  < SHIFT_RIGHT_ASSIGN: ">>=" > |
+
+
+// Pontuadores
+  < LBRACKET: "[" > |
+  < RBRACKET: "]" > |
+  < LPAREN: "(" > |
+  < RPAREN: ")" > |
+  < LBRACE: "{" > |
+  < RBRACE: "}" > |
+  < SEMICOLON: ";" > |
+  < COMMA: "," > |
+  < TERNARY: "?" > |
+  < COLON: ":" > |
+  < DOT: "." > |
+  < DOUBLE_QUOTE: "\"" > |
+  < SINGLE_QUOTE: "'" > |
+  < ELLIPSIS: "..." > |
+  < DOUBLE_HASH: "##" > |
+  < ARROW: "->" >
+
+}
