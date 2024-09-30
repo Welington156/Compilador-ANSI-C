@@ -1,0 +1,9 @@
+int f() {
+  int a;
+  a = 10;
+  {
+    int b = 3;
+  }
+  return b+a;
+}
+$ $
